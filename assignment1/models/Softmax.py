@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 
 class Softmax:
-    def __init__(self, n_class: int, lr: float, epochs: int, reg_const: float, batch_size: int):
+    def __init__(self, n_class: int, lr: float, epochs: int, reg_const: float, batch_size: int, random: bool):
         """Initialize a new classifier.
 
         Parameters:
@@ -19,6 +19,7 @@ class Softmax:
         self.reg_const = reg_const
         self.n_class = n_class
         self.batch_size = batch_size
+        self.random = random
 
     def calc_gradient(self, X_train: np.ndarray, y_train: np.ndarray) -> np.ndarray:
         """Calculate gradient of the softmax loss.
@@ -39,24 +40,6 @@ class Softmax:
 
         pass
 
-    def create_mini_batch(X_train, y_train, batch_size):
-        N = X_train.shape[0]
-        mini_batches = []
-
-
-        data = np.hstack((X_train, y_train))
-        np.random.shuffle(data)
-
-        num_batch = N // batch_size
-        for i in range(num_batch):
-            mini_batch = data[i * batch_size: (i+1) * batch_size]
-            x_mini = mini_batch[:,:-1]
-            y_mini = mini_batch[:,-1].reshape((-1,1))
-            mini_batches.append((x_mini, y_mini))
-
-        return mini_batches
-
-
     def train(self, X_train: np.ndarray, y_train: np.ndarray):
         """Train the classifier.
 
@@ -74,16 +57,20 @@ class Softmax:
         # Add a dummy feature for each training sample
         X_train = np.insert(X_train, D, values = 1, axis = 1)
         for _ in tqdm(range(self.epochs)):
-            randIndex = np.random.choice(range(N), self.batch_size, replace = False)
+            if self.random:
+                randIndex = np.random.choice(range(N), self.batch_size, replace = False)
+            else:
+                randIndex = range(N)
+                
             for i in randIndex:
                 y_gt = y_train[i]
                 y_pred = np.dot(self.w, X_train[i])
-                # y_pred -= np.max(y_pred)
+                y_pred -= np.max(y_pred)
                 y_pred = np.exp(y_pred)/np.sum(np.exp(y_pred))
 
                 for j in range(self.n_class):
                     if j == y_gt:
-                        self.w[j] += self.lr * (1 - y_pred[j]) * X_train[i]
+                        self.w[j] -= self.lr * (y_pred[j] - 1) * X_train[i]
                     else:
                         self.w[j] -= self.lr * y_pred[j] * X_train[i]
 
