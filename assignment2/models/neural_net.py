@@ -55,6 +55,15 @@ class NeuralNetwork:
             ) / np.sqrt(sizes[i - 1])
             self.params["b" + str(i)] = np.zeros(sizes[i])
 
+        self.outputs = {}
+        self.gradients = {}
+
+        # variable for adam optimizer
+        self.m = None
+        self.v = None
+        self.iter = 0
+
+
     def linear(self, W: np.ndarray, X: np.ndarray, b: np.ndarray) -> np.ndarray:
         """Fully connected (linear) layer.
 
@@ -133,7 +142,7 @@ class NeuralNetwork:
         return self.softmax(y)
 
     def backward(
-        self, X: np.ndarray, y: np.ndarray, lr: float, reg: float = 0.0
+        self, X: np.ndarray, y: np.ndarray, lr: float, reg: float = 0.0, beta1: float = 0.9, beta2: float = 0.999, mode: str = "SGD"
     ) -> float:
         """Perform back-propagation and update the parameters using the
         gradients.
@@ -177,8 +186,6 @@ class NeuralNetwork:
         grad_b = np.sum(dl_dh3, axis = 0)   # C,
         self.gradients["W" + str(self.num_layers)] = grad_w
         self.gradients["b" + str(self.num_layers)] = grad_b
-        self.params["W" + str(self.num_layers)] -= lr * grad_w
-        self.params["b" + str(self.num_layers)] -= lr * grad_b
 
         dl_dh = dl_dh3
         for i in range(self.num_layers - 1, 0, -1):
@@ -195,8 +202,27 @@ class NeuralNetwork:
             grad_b = np.sum(dl_dr, axis = 0)
             self.gradients["W" + str(i)] = grad_w
             self.gradients["b" + str(i)] = grad_b
-            self.params["W" + str(i)] -= lr * grad_w
-            self.params["b" + str(i)] -= lr * grad_b
             dl_dh = dl_dr
+
+        # SGD optimizer update
+        if mode.lower() == "sgd":
+            for key in self.params.keys():
+                self.params[key] -= lr * self.gradients[key]
+
+        elif mode.lower() == "adam":
+            # Adam optimizer update
+            if self.m == None:
+                self.m, self.v = {}, {}
+                for key, val in self.params.items():
+                    self.m[key] = np.zeros_like(val)
+                    self.v[key] = np.zeros_like(val)
+
+            self.iter += 1
+            lr_t = lr * np.sqrt(1.0 - beta2**self.iter) / (1.0 - beta1**self.iter)
+
+            for key in self.params.keys():
+                self.m[key] += (1 - beta1) * (self.gradients[key] - self.m[key])
+                self.v[key] += (1 - beta2) * (self.gradients[key]**2 - self.v[key])
+                self.params[key] -= lr_t * self.m[key] / (np.sqrt(self.v[key]) + 1e-8)
 
         return loss
